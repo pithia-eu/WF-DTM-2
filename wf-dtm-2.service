@@ -1,0 +1,18 @@
+[Unit]
+Description=Workdlow DTM 2 Rest API
+Documentation=https://github.com/pithia-eu/WF-DTM2/blob/main/README.md
+
+[Service]
+Type=simple
+User=root
+Group=root
+TimeoutStartSec=0
+Restart=on-failure
+RestartSec=30s
+#ExecStartPre=
+ExecStart=/home/ubuntu/WF-DTM2/start_wf_dtm_2.sh
+SyslogIdentifier=Diskutilization
+#ExecStop=
+
+[Install]
+WantedBy=multi-user.target
