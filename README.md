@@ -5,7 +5,7 @@ Follow these steps to set up and run the project:
 1. **Set the port number:** Open the file `start_dtm.sh` and change the port number based on the requirement.\
     The command to start the service looks like this:
 
-   `uvicorn main:app --reload --port 8080 --host 0.0.0.0`
+   `uvicorn main:app --reload --port 8085 --host 0.0.0.0`
 
 2. **Build the Python virtual environment:** 
 

@@ -19,4 +19,4 @@ else
 fi
 
 # Run the uvicorn server
-uvicorn main:app --reload --port 8080 --host 0.0.0.0
+uvicorn main:app --reload --port 8085 --host 0.0.0.0

@@ -288,4 +288,4 @@ async def run_workflow(
     os.remove(runs_output_file)
     os.remove(starlette_plot_file)
     print(f"Execution time: {exe_time}")
-    return FileResponse(zip_file, filename=f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.zip')
+    return FileResponse(zip_file, filename=f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.zip', media_type='application/octet-stream')
