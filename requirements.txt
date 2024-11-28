@@ -4,3 +4,4 @@ uvicorn==0.29.0
 matplotlib==3.8.4
 seaborn==0.13.2
 pydantic==2.7.1
+python-multipart==0.0.17

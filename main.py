@@ -2,12 +2,15 @@ import os
 import subprocess
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional, Annotated
+
 import pandas as pd
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 import matplotlib.pyplot as plt
+from pkg_resources import require
 
 description = """
 To compare observed atmospheric densities from the Starlette satellite with modeled densities from DTM2020 for a specified time interval.
@@ -68,6 +71,10 @@ output_dir = os.path.join(script_dir, 'output')
 # Create the output directory if it does not exist
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+# Create the uploads directory if it does not exist
+uploads_dir = os.path.join(script_dir, 'uploads')
+if not os.path.exists(uploads_dir):
+    os.makedirs(uploads_dir)
 
 app = FastAPI(title='DTM2020 Workflow 2 API',
               description=description,
@@ -126,10 +133,12 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date):
     plt.savefig(plot_file)
     plt.close()
 
-@app.get("/run_workflow", tags=["Run Workflow"])
+@app.post("/run_workflow", tags=["Run Workflow"])
 async def run_workflow(
         start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2024-01-01."),
-        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2024-01-02.")):
+        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2024-01-02."),
+        upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.")] = None,
+):
     exe_start_time = datetime.now()
     # Validate the start and end dates, the format should be 'YYYY-MM-DD' and the end date should be greater than the start date
     try:
@@ -144,6 +153,23 @@ async def run_workflow(
     # Construct the filename for the run, using the start and end dates, e.g. '2024-01-01_2024-01-02.input'
     run_filename = f'{run_id}.input'
     run_filepath = os.path.join(runs_dir, run_filename)
+
+    if upload_file:
+        # Save the uploaded file to the uploads directory
+        upload_file_path = os.path.join(uploads_dir, upload_file.filename)
+        with open(upload_file_path, "wb") as buffer:
+            buffer.write(upload_file.file.read())
+        # Simple verify the file by checking the first few lines
+        # The columns are: Year, Month, Day, decimal day-of-year, altitude (km), local solar time (hr), latitude (deg), longitude (deg), observed density (g/cm3)
+        # e.g. 2000  1  2    2.04514 805.980  10.86  -2.25  147.68  0.186E-16
+        with open(upload_file_path, 'r') as f:
+            first_lines = [next(f) for _ in range(5)]
+        print(first_lines)
+        # Check the first line to see if it contains the expected columns, it does not have the column names
+        if len(first_lines) == 0:
+            raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+        if len(first_lines[0].split()) != 9:
+            raise HTTPException(status_code=400, detail="The uploaded file does not contain the expected columns.")
 
     # Get the fm, f1, akp1, akp3 values for the run
     # Load the data from the URL
@@ -198,7 +224,10 @@ async def run_workflow(
     # Load the Starlette data, which has no header and is separated by whitespace
     # The columns are: Year, Month, Day, decimal day-of-year, altitude (km), local solar time (hr), latitude (deg), longitude (deg), observed density (g/cm3)
     # e.g. 2000  1  2    2.04514 805.980  10.86  -2.25  147.68  0.186E-16
-    starlette_df = pd.read_csv(starlette_data_file, sep='\s+', header=None, names=["Year", "Month", "Day", "Decimal_day", "Altitude", "Solar_time", "Latitude", "Longitude", "Observed_density"])
+    if not upload_file:
+        starlette_df = pd.read_csv(starlette_data_file, sep='\s+', header=None, names=["Year", "Month", "Day", "Decimal_day", "Altitude", "Solar_time", "Latitude", "Longitude", "Observed_density"])
+    else:
+        starlette_df = pd.read_csv(upload_file_path, sep='\s+', header=None, names=["Year", "Month", "Day", "Decimal_day", "Altitude", "Solar_time", "Latitude", "Longitude", "Observed_density"])
     # Create a new index from the year month and day columns, called Date
     starlette_df['Date'] = pd.to_datetime(starlette_df[['Year', 'Month', 'Day']])
     # Filter the starlette dataframe based on the start and end dates
@@ -287,5 +316,8 @@ async def run_workflow(
     os.remove(starlette_output_file)
     os.remove(runs_output_file)
     os.remove(starlette_plot_file)
+    # Delete the uploaded file from the uploads directory
+    if upload_file:
+        os.remove(upload_file_path)
     print(f"Execution time: {exe_time}")
     return FileResponse(zip_file, filename=f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.zip', media_type='application/octet-stream')
