@@ -282,6 +282,10 @@ async def run_workflow(
     # Zip the output files and plot, and return the zip file
     zip_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.zip')
     # Zip the output files
-    subprocess.run(['zip', '-j', zip_file, starlette_output_file, runs_output_file, starlette_plot_file])
+    subprocess.run(['zip', '-j', zip_file, starlette_output_file, starlette_plot_file])
+    # Delete the individual files
+    os.remove(starlette_output_file)
+    os.remove(runs_output_file)
+    os.remove(starlette_plot_file)
     print(f"Execution time: {exe_time}")
     return FileResponse(zip_file, filename=f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.zip')
