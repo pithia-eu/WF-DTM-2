@@ -13,7 +13,15 @@ import matplotlib.pyplot as plt
 from pkg_resources import require
 
 description = """
-To compare observed atmospheric densities from the Starlette satellite with modeled densities from DTM2020 for a specified time interval.
+In this workflow, observed density data is compared with DTM2020 density. Users can upload their density data for comparison, or the model can be compared with Starlette densities at around 800 km altitude (available from 1/1/2000 – 31/12/2023) to display an example of the results: a plot of the observed and model densities as well as the observed-to-modeled ratio, which values are also provided in a file.
+<br/>
+<br/>
+Users should upload a density file containing the following parameters per line:
+<br/>
+Year, month, day, day-of-the-year (1-366), local time (hr), latitude (deg), longitude (deg), density (g/cm3)
+<br/>
+<br/>
+The maximum number of measurements accepted by the workflow is 30 days.
 """
 
 tags_metadata = [
@@ -76,7 +84,7 @@ uploads_dir = os.path.join(script_dir, 'uploads')
 if not os.path.exists(uploads_dir):
     os.makedirs(uploads_dir)
 
-app = FastAPI(title='DTM2020 Workflow 2 API',
+app = FastAPI(title='DTM2020-density data comparison',
               description=description,
               version="1.0",
               openapi_tags=tags_metadata
@@ -92,9 +100,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def plot_starlette_data(data, output_dir, filename, start_date, end_date):
-    max_density = max(data["Observed_density"].max(), data["DTM2020_Density"].max()) * 1e17
-    min_ratio = min(data["Observed_to_Modeled_Ratio"].min(), data["Observed_to_Modeled_Ratio"].min()*1e17, data["Observed_to_Modeled_Ratio"].min()*1e17)*0.9
+def plot_starlette_data(data, output_dir, filename, start_date, end_date, user_uploaded):
+    max_density = max(data["Observed_density"].max(), data["DTM2020_Density"].max())
+    min_density = min(data["Observed_density"].min(), data["DTM2020_Density"].min())
+    min_ratio = min(data["Observed_to_Modeled_Ratio"].min(), 0.5)
     # Create a combined plot with two y-axes
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
@@ -104,11 +113,14 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date):
     ax1.plot(data["timestamp"], data["DTM2020_Density"], label="DTM2020 Density", linestyle='-', marker='o',
              color="green")
     ax1.set_xlabel(f"Timeseries from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-    ax1.set_ylabel("Density (kg/m^3)", color="blue")
+    if user_uploaded:
+        ax1.set_ylabel("Observations: user supplied Density (g/cm^3)", color="blue")
+    else:
+        ax1.set_ylabel("Observations: Starlette Density (kg/m^3)", color="blue")
     ax1.legend(loc="upper left")
     ax1.tick_params(axis='y', labelcolor="blue")
     # Set the minimum y-axis value to 0, but no maximum value
-    ax1.set_ylim(min_ratio/1e17, max_density/1e17*1.1)
+    ax1.set_ylim(min_density*0.8, max_density*1.1)
 
     # Create a second y-axis for ratios
     ax2 = ax1.twinx()
@@ -118,7 +130,7 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date):
     ax2.set_ylabel("Observed-to-Modeled Ratio", color="orange")
     ax2.legend(loc="upper right")
     ax2.tick_params(axis='y', labelcolor="orange")
-    ax2.set_ylim(min_ratio, max_density*1.1)  # Fixing the range for the second y-axis
+    ax2.set_ylim(min_ratio, 5)  # Fixing the range for the second y-axis
 
     # Set the x-axis labels to be the dates YYYY-MM-DD, don't display the time
     plt.xticks(rotation=45)
@@ -135,17 +147,26 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date):
 
 @app.post("/run_workflow", tags=["Run Workflow"])
 async def run_workflow(
-        start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2024-01-01."),
-        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2024-01-02."),
-        upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.")] = None,
+        start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
+        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
+        upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.<br/><br/>The density file should containing the following parameters per line: <br/>Year, month, day, day-of-the-year (1-366), local time (hr), latitude (deg), longitude (deg), density (g/cm3)")] = None,
 ):
     exe_start_time = datetime.now()
     # Validate the start and end dates, the format should be 'YYYY-MM-DD' and the end date should be greater than the start date
     try:
         start_date = datetime.strptime(start_date, '%Y-%m-%d')
         end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        # Check if the start date is before 2000-01-02, and the end date is after 2023-10-30
+        if start_date < datetime(2000, 1, 2):
+            raise HTTPException(status_code=400, detail="Start Date should be after 2000-01-02.")
+        if end_date > datetime(2023, 10, 30):
+            raise HTTPException(status_code=400, detail="End Date should be before 2023-10-30.")
         if start_date > end_date:
             raise HTTPException(status_code=400, detail="End Date should be greater than Start Date.")
+        else:
+            # Check if the difference between the start and end dates is more than 30 days
+            if (end_date - start_date).days > 30:
+                raise HTTPException(status_code=400, detail="The maximum number of measurements accepted by the workflow is 30 days.")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Please use the format 'YYYY-MM-DD'.")
     # Use UUID to generate a unique identifier for the run
@@ -289,7 +310,7 @@ async def run_workflow(
         starlette_df.at[index, 'akp3'] = akp3
 
     # Plot the data
-    plot_starlette_data(starlette_df, output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png', start_date, end_date)
+    plot_starlette_data(starlette_df, output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png', start_date, end_date, upload_file)
     starlette_plot_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png')
 
     # Remove the "timestamp" column from the starlette dataframe
@@ -315,7 +336,7 @@ async def run_workflow(
     # Delete the individual files
     os.remove(starlette_output_file)
     os.remove(runs_output_file)
-    os.remove(starlette_plot_file)
+    # os.remove(starlette_plot_file)
     # Delete the uploaded file from the uploads directory
     if upload_file:
         os.remove(upload_file_path)
