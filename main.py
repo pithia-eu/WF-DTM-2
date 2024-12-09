@@ -84,11 +84,13 @@ uploads_dir = os.path.join(script_dir, 'uploads')
 if not os.path.exists(uploads_dir):
     os.makedirs(uploads_dir)
 
-app = FastAPI(title='DTM2020-density data comparison',
-              description=description,
-              version="1.0",
-              openapi_tags=tags_metadata
-              )
+app = FastAPI(
+    title='DTM2020-density data comparison',
+    description=description,
+    version="1.0.0",
+    openapi_tags=tags_metadata,
+    root_path="/wf-dtm-2"
+    )
 
 origins = ["*"]
 
