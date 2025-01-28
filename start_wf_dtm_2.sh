@@ -4,7 +4,7 @@
 VENV_NAME=venv
 
 # Navigate to project directory
-cd /home/ubuntu/WF-DTM2
+cd /home/ubuntu/WF-DTM-2
 
 # Activate the venv
 source $VENV_NAME/bin/activate
