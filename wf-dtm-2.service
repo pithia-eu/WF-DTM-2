@@ -10,7 +10,7 @@ TimeoutStartSec=0
 Restart=on-failure
 RestartSec=30s
 #ExecStartPre=
-ExecStart=/home/ubuntu/WF-DTM2/start_wf_dtm_2.sh
+ExecStart=/home/ubuntu/WF-DTM-2/start_wf_dtm_2.sh
 SyslogIdentifier=Diskutilization
 #ExecStop=
 
