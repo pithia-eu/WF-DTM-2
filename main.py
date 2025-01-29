@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 import matplotlib.pyplot as plt
-from pkg_resources import require
 
 description = """
 In this workflow, observed density data is compared with DTM2020 density. Users can upload their density data for comparison, or the model can be compared with Starlette densities at around 800 km altitude (available from 1/1/2000 – 31/12/2023) to display an example of the results: a plot of the observed and model densities as well as the observed-to-modeled ratio, which values are also provided in a file.
@@ -27,7 +26,7 @@ The maximum number of measurements accepted by the workflow is 30 days.
 tags_metadata = [
     {
         "name": "Run Workflow",
-        "description": "Return the comparison of observed atmospheric densities from the Starlette satellite with modeled densities from DTM2020 for a specified time interval.",
+        "description": "Return the comparison of observed atmospheric densities from the Starlette satellite (default) or your own density file with modeled densities from DTM2020 for a specified time interval. <br/>The downloaded file is a zip-file, and must be renamed as such.",
     },
 ]
 
@@ -132,7 +131,9 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date, user_u
     ax2.set_ylabel("Observed-to-Modeled Ratio", color="orange")
     ax2.legend(loc="upper right")
     ax2.tick_params(axis='y', labelcolor="orange")
-    ax2.set_ylim(min_ratio, 5)  # Fixing the range for the second y-axis
+    # Set the max_ratio to 2, or the maximum value in the data + 1, whichever is higher
+    max_ratio = max(data["Observed_to_Modeled_Ratio"].max()+1, 3)
+    ax2.set_ylim(min_ratio, max_ratio)  # Fixing the range for the second y-axis
 
     # Set the x-axis labels to be the dates YYYY-MM-DD, don't display the time
     plt.xticks(rotation=45)
@@ -151,7 +152,7 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date, user_u
 async def run_workflow(
         start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
         end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
-        upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.<br/><br/>The density file should containing the following parameters per line: <br/>Year, month, day, day-of-the-year (1-366), local time (hr), latitude (deg), longitude (deg), density (g/cm3)")] = None,
+        upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.<br/><br/>The density file should containing the following parameters per line: <br/>Year, month, day, day-of-the-year (1-366), altitude (km), local time (hr), latitude (deg), longitude (deg), density (g/cm3)")] = None,
 ):
     exe_start_time = datetime.now()
     # Validate the start and end dates, the format should be 'YYYY-MM-DD' and the end date should be greater than the start date
@@ -313,12 +314,12 @@ async def run_workflow(
 
     # Plot the data
     plot_starlette_data(starlette_df, output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png', start_date, end_date, upload_file)
-    starlette_plot_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png')
+    starlette_plot_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_plot.png')
 
     # Remove the "timestamp" column from the starlette dataframe
     starlette_df.drop(columns=['timestamp'], inplace=True)
     # Save the updated starlette dataframe to a new file
-    starlette_output_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_output.dat')
+    starlette_output_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_output.dat')
     starlette_df.to_csv(starlette_output_file, sep=' ', index=False)
     # Save the runs data to a new file
     runs_output_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_runs_output.dat')
