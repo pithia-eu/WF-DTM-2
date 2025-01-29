@@ -313,7 +313,7 @@ async def run_workflow(
         starlette_df.at[index, 'akp3'] = akp3
 
     # Plot the data
-    plot_starlette_data(starlette_df, output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_starlette_plot.png', start_date, end_date, upload_file)
+    plot_starlette_data(starlette_df, output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_plot.png', start_date, end_date, upload_file)
     starlette_plot_file = os.path.join(output_dir, f'{start_date.strftime("%Y-%m-%d")}_{end_date.strftime("%Y-%m-%d")}_plot.png')
 
     # Remove the "timestamp" column from the starlette dataframe
