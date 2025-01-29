@@ -17,7 +17,7 @@ In this workflow, observed density data is compared with DTM2020 density. Users 
 <br/>
 Users should upload a density file containing the following parameters per line:
 <br/>
-Year, month, day, day-of-the-year (1-366), local time (hr), latitude (deg), longitude (deg), density (g/cm3)
+Year, month, day, day-of-the-year (1-366), Altitude (km), local time (hr), latitude (deg), longitude (deg), density (g/cm3)
 <br/>
 <br/>
 The maximum number of measurements accepted by the workflow is 30 days.
@@ -131,9 +131,7 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date, user_u
     ax2.set_ylabel("Observed-to-Modeled Ratio", color="orange")
     ax2.legend(loc="upper right")
     ax2.tick_params(axis='y', labelcolor="orange")
-    # Set the max_ratio to 2, or the maximum value in the data + 1, whichever is higher
-    max_ratio = max(data["Observed_to_Modeled_Ratio"].max()+1, 3)
-    ax2.set_ylim(min_ratio, max_ratio)  # Fixing the range for the second y-axis
+    ax2.set_ylim(data["Observed_to_Modeled_Ratio"].min()*0.8, data["Observed_to_Modeled_Ratio"].max()*1.1)  # Fixing the range for the second y-axis
 
     # Set the x-axis labels to be the dates YYYY-MM-DD, don't display the time
     plt.xticks(rotation=45)
@@ -150,8 +148,8 @@ def plot_starlette_data(data, output_dir, filename, start_date, end_date, user_u
 
 @app.post("/run_workflow", tags=["Run Workflow"])
 async def run_workflow(
-        start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
-        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30"),
+        start_date: str = Query(..., description="Start Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30. <br/>The maximum number of measurements accepted by the workflow is 30 days."),
+        end_date: str = Query(..., description="End Date in the format 'YYYY-MM-DD', e.g. 2000-01-02, available from 2000-01-02 – 2023-10-30. <br/>The maximum number of measurements accepted by the workflow is 30 days."),
         upload_file: Annotated[UploadFile, File(..., description="Optional: Upload a file containing the Starlette data.<br/><br/>The density file should containing the following parameters per line: <br/>Year, month, day, day-of-the-year (1-366), altitude (km), local time (hr), latitude (deg), longitude (deg), density (g/cm3)")] = None,
 ):
     exe_start_time = datetime.now()
